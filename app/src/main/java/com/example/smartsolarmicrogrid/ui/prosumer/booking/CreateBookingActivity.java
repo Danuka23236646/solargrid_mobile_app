@@ -110,6 +110,8 @@ public class CreateBookingActivity extends AppCompatActivity {
                         try {
                             if (dto.getId() != null && dto.getId().matches("\\d+")) {
                                 stationId = Integer.parseInt(dto.getId());
+                            } else if (dto.getId() != null) {
+                                stationId = Math.abs(dto.getId().hashCode());
                             }
                         } catch (Exception ignored) {}
 
@@ -125,10 +127,19 @@ public class CreateBookingActivity extends AppCompatActivity {
                         if (dto.getId() != null) {
                             s.setStringId(dto.getId()); // Store real MongoDB station ObjectId
                         }
-                        s.setCurrentStoredEnergyKwh(dto.getCurrentStoredEnergyKwh());
-                        s.setAvailableIntakeKwh(dto.getAvailableIntakeKwh());
-                        s.setBatteryStoragePercentage(dto.getBatteryStoragePercentage());
-                        s.setOutOfStorage(dto.isOutOfStorage() || dto.getAvailableSlots() <= 0 || dto.getAvailableIntakeKwh() <= 0);
+                        if (dto.getCurrentStoredEnergyKwh() != null) {
+                            s.setCurrentStoredEnergyKwh(dto.getCurrentStoredEnergyKwh());
+                        }
+                        if (dto.getAvailableIntakeKwh() != null) {
+                            s.setAvailableIntakeKwh(dto.getAvailableIntakeKwh());
+                        }
+                        if (dto.getBatteryStoragePercentage() != null) {
+                            s.setBatteryStoragePercentage(dto.getBatteryStoragePercentage());
+                        }
+
+                        boolean outOfStorage = dto.isOutOfStorage() || dto.getAvailableSlots() <= 0
+                                || (dto.getAvailableIntakeKwh() != null && dto.getAvailableIntakeKwh() <= 0.0);
+                        s.setOutOfStorage(outOfStorage);
                         fetchedStations.add(s);
                     }
 
@@ -145,7 +156,7 @@ public class CreateBookingActivity extends AppCompatActivity {
 
             @Override
             public void onFailure(Call<List<StationDto>> call, Throwable t) {
-                // Network failure fallback
+                android.util.Log.e("CreateBooking", "Failed to fetch live stations: " + t.getMessage(), t);
             }
         });
     }
@@ -158,10 +169,14 @@ public class CreateBookingActivity extends AppCompatActivity {
         for (int i = 0; i < stationList.size(); i++) {
             SolarStation s = stationList.get(i);
             String label;
-            if (s.isOutOfStorage() || s.getAvailableIntakeKwh() <= 0) {
-                label = s.getName() + " [â›” OUT OF STORAGE - BATTERY FULL]";
+            if (s.isOutOfStorage()) {
+                label = s.getName() + " [\u26D4 OUT OF STORAGE - BATTERY FULL]";
             } else {
-                label = s.getName() + " (" + s.getAvailableSlots() + " slots, " + String.format(Locale.getDefault(), "%.1f", s.getAvailableIntakeKwh()) + " kWh intake avail)";
+                if (s.getAvailableIntakeKwh() > 0) {
+                    label = s.getName() + " (" + s.getAvailableSlots() + " slots, " + String.format(Locale.getDefault(), "%.1f", s.getAvailableIntakeKwh()) + " kWh intake avail)";
+                } else {
+                    label = s.getName() + " (" + s.getAvailableSlots() + " slots available)";
+                }
             }
             stationNames.add(label);
             if (s.getId() == preselectedStationId) {
@@ -289,10 +304,10 @@ public class CreateBookingActivity extends AppCompatActivity {
         boolean isSell = rbSell.isChecked();
 
         // Enforce Substation Storage Capacity constraint: Prosumers cannot SELL into full substations
-        if (isSell && (station.isOutOfStorage() || station.getAvailableIntakeKwh() <= 0)) {
+        if (isSell && station.isOutOfStorage()) {
             new AlertDialog.Builder(this)
-                    .setTitle("Substation Out of Storage â›”")
-                    .setMessage("Substation '" + station.getName() + "' is currently at full battery capacity (0.0 kWh intake headroom) and cannot accept energy drop-offs.\n\nPlease select another microgrid substation or switch transaction type to Charging (Buy).")
+                    .setTitle("Substation Out of Storage \u26D4")
+                    .setMessage("Substation '" + station.getName() + "' currently cannot accept energy drop-offs.\n\nPlease select another microgrid substation or switch transaction type to Charging (Buy).")
                     .setPositiveButton("OK", null)
                     .show();
             return;
@@ -301,7 +316,7 @@ public class CreateBookingActivity extends AppCompatActivity {
         // Enforce Substation Storage Headroom constraint: Requested volume cannot exceed remaining intake capacity
         if (isSell && station.getAvailableIntakeKwh() > 0 && kwh > station.getAvailableIntakeKwh()) {
             new AlertDialog.Builder(this)
-                    .setTitle("Storage Headroom Exceeded âš ï¸")
+                    .setTitle("Storage Headroom Exceeded \u26A0")
                     .setMessage("The requested drop-off of " + kwh + " kWh exceeds the remaining battery storage headroom (" + String.format(Locale.getDefault(), "%.1f", station.getAvailableIntakeKwh()) + " kWh) for substation '" + station.getName() + "'.\n\nPlease reduce the energy amount or select another substation.")
                     .setPositiveButton("OK", null)
                     .show();
@@ -340,7 +355,7 @@ public class CreateBookingActivity extends AppCompatActivity {
                 transferTypeApi,
                 kwh,
                 scheduledTimeCombined,
-                "Microgrid Transfer Reservation"
+                "Microgrid Transfer Reservation [Booking #" + booking.getId() + "]"
         );
 
         if (editBookingId > 0) {
@@ -378,7 +393,7 @@ public class CreateBookingActivity extends AppCompatActivity {
                         } catch (Exception ignored) {}
 
                         new AlertDialog.Builder(CreateBookingActivity.this)
-                                .setTitle("Update Failed â›”")
+                                .setTitle("Update Failed \u26D4")
                                 .setMessage(errMsg)
                                 .setPositiveButton("OK", null)
                                 .show();
@@ -413,6 +428,10 @@ public class CreateBookingActivity extends AppCompatActivity {
                                 booking.setId(realId);
                             } catch (Exception ignored) {}
                         }
+                        if (dto.getId() != null) {
+                            String realQr = "SUNGRID:RESERVATION:" + dto.getId() + ":" + prosumerNic;
+                            booking.setQrData(realQr);
+                        }
                         if (dto.getQrPayload() != null) {
                             booking.setQrData(dto.getQrPayload());
                         }
@@ -438,7 +457,7 @@ public class CreateBookingActivity extends AppCompatActivity {
                         } catch (Exception ignored) {}
 
                         new AlertDialog.Builder(CreateBookingActivity.this)
-                                .setTitle("Booking Rejected â›”")
+                                .setTitle("Booking Rejected \u26D4")
                                 .setMessage(errMsg)
                                 .setPositiveButton("OK", null)
                                 .show();

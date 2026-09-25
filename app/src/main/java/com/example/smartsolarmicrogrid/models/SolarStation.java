@@ -15,8 +15,8 @@ public class SolarStation implements Serializable {
     private double capacityKw;
     private int availableSlots;
     private double currentStoredEnergyKwh;
-    private double availableIntakeKwh;
-    private int batteryStoragePercentage;
+    private double availableIntakeKwh = -1.0; // -1 indicates not set
+    private double batteryStoragePercentage;
     private boolean isOutOfStorage;
 
     public SolarStation() {}
@@ -30,6 +30,7 @@ public class SolarStation implements Serializable {
         this.capacityKw = capacityKw;
         this.availableSlots = availableSlots;
         this.isOutOfStorage = availableSlots <= 0;
+        this.availableIntakeKwh = -1.0;
     }
 
     public int getId() {
@@ -114,21 +115,24 @@ public class SolarStation implements Serializable {
 
     public void setAvailableIntakeKwh(double availableIntakeKwh) {
         this.availableIntakeKwh = availableIntakeKwh;
-        if (availableIntakeKwh <= 0) {
+        if (availableIntakeKwh == 0.0) {
             this.isOutOfStorage = true;
         }
     }
 
-    public int getBatteryStoragePercentage() {
+    public double getBatteryStoragePercentage() {
         return batteryStoragePercentage;
     }
 
-    public void setBatteryStoragePercentage(int batteryStoragePercentage) {
+    public void setBatteryStoragePercentage(double batteryStoragePercentage) {
         this.batteryStoragePercentage = batteryStoragePercentage;
     }
 
     public boolean isOutOfStorage() {
-        return isOutOfStorage || availableSlots <= 0 || availableIntakeKwh <= 0;
+        if (isOutOfStorage) return true;
+        if (availableSlots <= 0) return true;
+        if (availableIntakeKwh >= 0 && availableIntakeKwh <= 0.0) return true;
+        return false;
     }
 
     public void setOutOfStorage(boolean outOfStorage) {

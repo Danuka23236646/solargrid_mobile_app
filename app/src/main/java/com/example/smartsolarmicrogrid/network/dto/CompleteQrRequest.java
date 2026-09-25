@@ -6,6 +6,9 @@ public class CompleteQrRequest {
     @SerializedName("qrPayload")
     private String qrPayload;
 
+    @SerializedName("reservationId")
+    private String reservationId;
+
     @SerializedName("actualEnergyAmountKwh")
     private double actualEnergyAmountKwh;
 
@@ -14,10 +17,15 @@ public class CompleteQrRequest {
 
     public CompleteQrRequest() {}
 
-    public CompleteQrRequest(String qrPayload, double actualEnergyAmountKwh, String completionNotes) {
+    public CompleteQrRequest(String qrPayload, String reservationId, double actualEnergyAmountKwh, String completionNotes) {
         this.qrPayload = qrPayload;
+        this.reservationId = reservationId;
         this.actualEnergyAmountKwh = actualEnergyAmountKwh;
         this.completionNotes = completionNotes;
+    }
+
+    public CompleteQrRequest(String qrPayload, double actualEnergyAmountKwh, String completionNotes) {
+        this(qrPayload, null, actualEnergyAmountKwh, completionNotes);
     }
 
     public String getQrPayload() {
@@ -26,6 +34,14 @@ public class CompleteQrRequest {
 
     public void setQrPayload(String qrPayload) {
         this.qrPayload = qrPayload;
+    }
+
+    public String getReservationId() {
+        return reservationId;
+    }
+
+    public void setReservationId(String reservationId) {
+        this.reservationId = reservationId;
     }
 
     public double getActualEnergyAmountKwh() {

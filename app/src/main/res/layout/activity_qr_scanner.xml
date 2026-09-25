@@ -40,14 +40,14 @@
     </LinearLayout>
 
     <com.google.android.material.button.MaterialButton
-        android:id="@+id/btnSimulateManualScan"
+        android:id="@+id/btnManualInput"
         android:layout_width="match_parent"
         android:layout_height="52dp"
         android:layout_alignParentBottom="true"
         android:layout_margin="20dp"
-        android:text="SIMULATE DISPATCH VERIFICATION (DEMO)"
+        android:text="ENTER RESERVATION CODE MANUALLY"
         android:textSize="13sp"
         app:cornerRadius="10dp"
-        android:backgroundTint="#1565C0" />
+        android:backgroundTint="#37474F" />
 
 </RelativeLayout>

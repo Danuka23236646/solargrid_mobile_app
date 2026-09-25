@@ -17,6 +17,7 @@ import com.example.smartsolarmicrogrid.network.dto.VerifyQrRequest;
 
 import java.util.List;
 
+import okhttp3.ResponseBody;
 import retrofit2.Call;
 import retrofit2.http.Body;
 import retrofit2.http.GET;
@@ -25,9 +26,6 @@ import retrofit2.http.PUT;
 import retrofit2.http.Path;
 import retrofit2.http.Query;
 
-/**
- * Retrofit 2 REST API interface for SunGrid Mobile App backend.
- */
 public interface ApiService {
 
     @POST("auth/login")
@@ -39,8 +37,8 @@ public interface ApiService {
     @GET("reservations/me/dashboard")
     Call<DashboardSummaryDto> getMyDashboardSummary();
 
-    @GET("reservations/me/current")
-    Call<List<ReservationDto>> getMyCurrentReservations();
+    @GET("reservations/dashboard/summary")
+    Call<DashboardSummaryDto> getDashboardSummary();
 
     @GET("reservations/me")
     Call<List<ReservationDto>> getMyReservationsList(@Query("pageSize") int pageSize);
@@ -86,8 +84,8 @@ public interface ApiService {
     Call<UserDto> updateMyUserProfile(@Body UserDto userDto);
 
     @POST("qr/verify")
-    Call<ReservationDto> verifyQrPayload(@Body VerifyQrRequest request);
+    Call<ResponseBody> verifyQrPayload(@Body VerifyQrRequest request);
 
     @POST("qr/complete")
-    Call<ApiResponse<Void>> completeQrTransfer(@Body CompleteQrRequest request);
+    Call<ResponseBody> completeQrTransfer(@Body CompleteQrRequest request);
 }

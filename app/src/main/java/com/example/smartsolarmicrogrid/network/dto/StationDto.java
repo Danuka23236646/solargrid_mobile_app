@@ -38,16 +38,16 @@ public class StationDto implements Serializable {
     private double dispatchedEnergyKwh;
 
     @SerializedName("currentStoredEnergyKwh")
-    private double currentStoredEnergyKwh;
+    private Double currentStoredEnergyKwh;
 
     @SerializedName("pendingIntakeKwh")
-    private double pendingIntakeKwh;
+    private Double pendingIntakeKwh;
 
     @SerializedName("availableIntakeKwh")
-    private double availableIntakeKwh;
+    private Double availableIntakeKwh;
 
     @SerializedName("batteryStoragePercentage")
-    private int batteryStoragePercentage;
+    private Double batteryStoragePercentage;
 
     @SerializedName("isOutOfStorage")
     private boolean isOutOfStorage;
@@ -148,40 +148,43 @@ public class StationDto implements Serializable {
         this.dispatchedEnergyKwh = dispatchedEnergyKwh;
     }
 
-    public double getCurrentStoredEnergyKwh() {
+    public Double getCurrentStoredEnergyKwh() {
         return currentStoredEnergyKwh;
     }
 
-    public void setCurrentStoredEnergyKwh(double currentStoredEnergyKwh) {
+    public void setCurrentStoredEnergyKwh(Double currentStoredEnergyKwh) {
         this.currentStoredEnergyKwh = currentStoredEnergyKwh;
     }
 
-    public double getPendingIntakeKwh() {
+    public Double getPendingIntakeKwh() {
         return pendingIntakeKwh;
     }
 
-    public void setPendingIntakeKwh(double pendingIntakeKwh) {
+    public void setPendingIntakeKwh(Double pendingIntakeKwh) {
         this.pendingIntakeKwh = pendingIntakeKwh;
     }
 
-    public double getAvailableIntakeKwh() {
+    public Double getAvailableIntakeKwh() {
         return availableIntakeKwh;
     }
 
-    public void setAvailableIntakeKwh(double availableIntakeKwh) {
+    public void setAvailableIntakeKwh(Double availableIntakeKwh) {
         this.availableIntakeKwh = availableIntakeKwh;
     }
 
-    public int getBatteryStoragePercentage() {
+    public Double getBatteryStoragePercentage() {
         return batteryStoragePercentage;
     }
 
-    public void setBatteryStoragePercentage(int batteryStoragePercentage) {
+    public void setBatteryStoragePercentage(Double batteryStoragePercentage) {
         this.batteryStoragePercentage = batteryStoragePercentage;
     }
 
     public boolean isOutOfStorage() {
-        return isOutOfStorage || availableSlots <= 0 || availableIntakeKwh <= 0;
+        if (isOutOfStorage) return true;
+        if (availableSlots <= 0) return true;
+        if (availableIntakeKwh != null && availableIntakeKwh <= 0.0) return true;
+        return false;
     }
 
     public void setOutOfStorage(boolean outOfStorage) {

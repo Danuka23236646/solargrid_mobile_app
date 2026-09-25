@@ -20,7 +20,7 @@ import java.util.List;
 public class DatabaseHelper extends SQLiteOpenHelper {
 
     private static final String DATABASE_NAME = "smart_solar_microgrid.db";
-    private static final int DATABASE_VERSION = 3;
+    private static final int DATABASE_VERSION = 4;
 
     // Table names
     public static final String TABLE_USERS = "users_table";
@@ -38,12 +38,16 @@ public class DatabaseHelper extends SQLiteOpenHelper {
 
     // Stations Table Columns
     public static final String COL_STATION_ID = "id";
+    public static final String COL_STATION_STRING_ID = "string_id";
     public static final String COL_STATION_NAME = "name";
     public static final String COL_STATION_ADDRESS = "address";
     public static final String COL_STATION_LAT = "latitude";
     public static final String COL_STATION_LNG = "longitude";
     public static final String COL_STATION_CAPACITY = "capacity_kw";
     public static final String COL_STATION_SLOTS = "available_slots";
+    public static final String COL_STATION_AVAILABLE_INTAKE = "available_intake_kwh";
+    public static final String COL_STATION_CURRENT_STORED = "current_stored_kwh";
+    public static final String COL_STATION_IS_OUT_OF_STORAGE = "is_out_of_storage";
 
     // Bookings Table Columns
     public static final String COL_BOOKING_ID = "id";
@@ -85,12 +89,16 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         // Create stations_cache
         String createStationsTable = "CREATE TABLE " + TABLE_STATIONS + " ("
                 + COL_STATION_ID + " INTEGER PRIMARY KEY, "
+                + COL_STATION_STRING_ID + " TEXT, "
                 + COL_STATION_NAME + " TEXT, "
                 + COL_STATION_ADDRESS + " TEXT, "
                 + COL_STATION_LAT + " REAL, "
                 + COL_STATION_LNG + " REAL, "
                 + COL_STATION_CAPACITY + " REAL, "
-                + COL_STATION_SLOTS + " INTEGER)";
+                + COL_STATION_SLOTS + " INTEGER, "
+                + COL_STATION_AVAILABLE_INTAKE + " REAL, "
+                + COL_STATION_CURRENT_STORED + " REAL, "
+                + COL_STATION_IS_OUT_OF_STORAGE + " INTEGER)";
         db.execSQL(createStationsTable);
 
         // Create bookings_cache
@@ -127,7 +135,7 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         db.execSQL("DELETE FROM " + TABLE_BOOKINGS);
     }
 
-    // ==================== USER OPERATIONS ====================
+    // ==================== USERS OPERATIONS ====================
 
     public long saveUser(User user) {
         SQLiteDatabase db = this.getWritableDatabase();
@@ -140,6 +148,10 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         cv.put(COL_USER_STATUS, user.getStatus() != null ? user.getStatus() : "Active");
 
         return db.insertWithOnConflict(TABLE_USERS, null, cv, SQLiteDatabase.CONFLICT_REPLACE);
+    }
+
+    public long insertUser(User user) {
+        return saveUser(user);
     }
 
     public User getUserByNic(String nic) {
@@ -164,6 +176,31 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         }
         if (cursor != null) cursor.close();
         return null;
+    }
+
+    public User getLoggedInUser() {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.query(TABLE_USERS, null, COL_USER_TOKEN + " IS NOT NULL AND " + COL_USER_TOKEN + " != ''", null, null, null, COL_USER_ID + " DESC", "1");
+        if (cursor != null && cursor.moveToFirst()) {
+            User user = parseUser(cursor);
+            cursor.close();
+            return user;
+        }
+        if (cursor != null) cursor.close();
+        return null;
+    }
+
+    public boolean updateUser(User user) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues cv = new ContentValues();
+        cv.put(COL_USER_NAME, user.getName());
+        cv.put(COL_USER_EMAIL, user.getEmail());
+        cv.put(COL_USER_ROLE, user.getRole());
+        cv.put(COL_USER_TOKEN, user.getToken());
+        cv.put(COL_USER_STATUS, user.getStatus());
+
+        int rows = db.update(TABLE_USERS, cv, COL_USER_NIC + "=?", new String[]{user.getNic()});
+        return rows > 0;
     }
 
     public boolean updateUserStatus(String nic, String newStatus) {
@@ -192,16 +229,23 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         SQLiteDatabase db = this.getWritableDatabase();
         db.beginTransaction();
         try {
-            for (SolarStation station : stations) {
-                ContentValues cv = new ContentValues();
-                cv.put(COL_STATION_ID, station.getId());
-                cv.put(COL_STATION_NAME, station.getName());
-                cv.put(COL_STATION_ADDRESS, station.getAddress());
-                cv.put(COL_STATION_LAT, station.getLatitude());
-                cv.put(COL_STATION_LNG, station.getLongitude());
-                cv.put(COL_STATION_CAPACITY, station.getCapacityKw());
-                cv.put(COL_STATION_SLOTS, station.getAvailableSlots());
-                db.insertWithOnConflict(TABLE_STATIONS, null, cv, SQLiteDatabase.CONFLICT_REPLACE);
+            db.delete(TABLE_STATIONS, null, null);
+            if (stations != null) {
+                for (SolarStation station : stations) {
+                    ContentValues cv = new ContentValues();
+                    cv.put(COL_STATION_ID, station.getId());
+                    cv.put(COL_STATION_STRING_ID, station.getStringId());
+                    cv.put(COL_STATION_NAME, station.getName());
+                    cv.put(COL_STATION_ADDRESS, station.getAddress());
+                    cv.put(COL_STATION_LAT, station.getLatitude());
+                    cv.put(COL_STATION_LNG, station.getLongitude());
+                    cv.put(COL_STATION_CAPACITY, station.getCapacityKw());
+                    cv.put(COL_STATION_SLOTS, station.getAvailableSlots());
+                    cv.put(COL_STATION_AVAILABLE_INTAKE, station.getAvailableIntakeKwh());
+                    cv.put(COL_STATION_CURRENT_STORED, station.getCurrentStoredEnergyKwh());
+                    cv.put(COL_STATION_IS_OUT_OF_STORAGE, station.isOutOfStorage() ? 1 : 0);
+                    db.insertWithOnConflict(TABLE_STATIONS, null, cv, SQLiteDatabase.CONFLICT_REPLACE);
+                }
             }
             db.setTransactionSuccessful();
         } finally {
@@ -217,12 +261,29 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             do {
                 SolarStation s = new SolarStation();
                 s.setId(cursor.getInt(cursor.getColumnIndexOrThrow(COL_STATION_ID)));
+                int strIdIdx = cursor.getColumnIndex(COL_STATION_STRING_ID);
+                if (strIdIdx != -1) {
+                    s.setStringId(cursor.getString(strIdIdx));
+                }
                 s.setName(cursor.getString(cursor.getColumnIndexOrThrow(COL_STATION_NAME)));
                 s.setAddress(cursor.getString(cursor.getColumnIndexOrThrow(COL_STATION_ADDRESS)));
                 s.setLatitude(cursor.getDouble(cursor.getColumnIndexOrThrow(COL_STATION_LAT)));
                 s.setLongitude(cursor.getDouble(cursor.getColumnIndexOrThrow(COL_STATION_LNG)));
                 s.setCapacityKw(cursor.getDouble(cursor.getColumnIndexOrThrow(COL_STATION_CAPACITY)));
                 s.setAvailableSlots(cursor.getInt(cursor.getColumnIndexOrThrow(COL_STATION_SLOTS)));
+
+                int intakeIdx = cursor.getColumnIndex(COL_STATION_AVAILABLE_INTAKE);
+                if (intakeIdx != -1) {
+                    s.setAvailableIntakeKwh(cursor.getDouble(intakeIdx));
+                }
+                int storedIdx = cursor.getColumnIndex(COL_STATION_CURRENT_STORED);
+                if (storedIdx != -1) {
+                    s.setCurrentStoredEnergyKwh(cursor.getDouble(storedIdx));
+                }
+                int oosIdx = cursor.getColumnIndex(COL_STATION_IS_OUT_OF_STORAGE);
+                if (oosIdx != -1) {
+                    s.setOutOfStorage(cursor.getInt(oosIdx) == 1);
+                }
                 list.add(s);
             } while (cursor.moveToNext());
             cursor.close();
@@ -236,12 +297,29 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         if (cursor != null && cursor.moveToFirst()) {
             SolarStation s = new SolarStation();
             s.setId(cursor.getInt(cursor.getColumnIndexOrThrow(COL_STATION_ID)));
+            int strIdIdx = cursor.getColumnIndex(COL_STATION_STRING_ID);
+            if (strIdIdx != -1) {
+                s.setStringId(cursor.getString(strIdIdx));
+            }
             s.setName(cursor.getString(cursor.getColumnIndexOrThrow(COL_STATION_NAME)));
             s.setAddress(cursor.getString(cursor.getColumnIndexOrThrow(COL_STATION_ADDRESS)));
             s.setLatitude(cursor.getDouble(cursor.getColumnIndexOrThrow(COL_STATION_LAT)));
             s.setLongitude(cursor.getDouble(cursor.getColumnIndexOrThrow(COL_STATION_LNG)));
             s.setCapacityKw(cursor.getDouble(cursor.getColumnIndexOrThrow(COL_STATION_CAPACITY)));
             s.setAvailableSlots(cursor.getInt(cursor.getColumnIndexOrThrow(COL_STATION_SLOTS)));
+
+            int intakeIdx = cursor.getColumnIndex(COL_STATION_AVAILABLE_INTAKE);
+            if (intakeIdx != -1) {
+                s.setAvailableIntakeKwh(cursor.getDouble(intakeIdx));
+            }
+            int storedIdx = cursor.getColumnIndex(COL_STATION_CURRENT_STORED);
+            if (storedIdx != -1) {
+                s.setCurrentStoredEnergyKwh(cursor.getDouble(storedIdx));
+            }
+            int oosIdx = cursor.getColumnIndex(COL_STATION_IS_OUT_OF_STORAGE);
+            if (oosIdx != -1) {
+                s.setOutOfStorage(cursor.getInt(oosIdx) == 1);
+            }
             cursor.close();
             return s;
         }

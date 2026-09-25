@@ -13,7 +13,7 @@ import okhttp3.Response;
 
 /**
  * OkHttp Interceptor that automatically attaches 'Authorization: Bearer <JWT_TOKEN>'
- * to outgoing HTTP requests.
+ * and 'ngrok-skip-browser-warning: true' to outgoing HTTP requests.
  */
 public class AuthInterceptor implements Interceptor {
 
@@ -28,13 +28,13 @@ public class AuthInterceptor implements Interceptor {
         Request originalRequest = chain.request();
         String token = sessionManager.getAuthToken();
 
+        Request.Builder builder = originalRequest.newBuilder()
+                .header("ngrok-skip-browser-warning", "true");
+
         if (!TextUtils.isEmpty(token)) {
-            Request authenticatedRequest = originalRequest.newBuilder()
-                    .header("Authorization", "Bearer " + token)
-                    .build();
-            return chain.proceed(authenticatedRequest);
+            builder.header("Authorization", "Bearer " + token);
         }
 
-        return chain.proceed(originalRequest);
+        return chain.proceed(builder.build());
     }
 }
